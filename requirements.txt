@@ -2,3 +2,4 @@ streamlit
 pandas
 matplotlib
 plotly
+ezdxf  # <-- 新增，用于生成 CAD 文件
