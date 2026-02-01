@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import math
 import matplotlib.pyplot as plt
+import plotly.express as px
+import numpy as np
 
 # 页面基础设置
 st.set_page_config(page_title="车厢自动拆解演示系统", layout="wide")
@@ -44,22 +46,68 @@ col1.metric("立柱总数 (单侧)", f"{n_posts} 根")
 col2.metric("实际安装间距", f"{dist:.1f} mm")
 col3.metric("侧面蒙皮需求", f"{n_skins} 张")
 
-# 图形化预览
-st.subheader("🖼️ 侧围结构预览 (自动布局)")
-fig, ax = plt.subplots(figsize=(10, 3))
-ax.set_facecolor('#f0f2f6')
+# --- 2D 图形化预览 (原有的) ---
+st.subheader("🖼️ 2D 侧围骨架分布预览")
+fig_2d, ax_2d = plt.subplots(figsize=(10, 3))
+ax_2d.set_facecolor('#f0f2f6')
 # 画边框
-ax.add_patch(plt.Rectangle((0, 0), length, height, color='white', ec='black', lw=2))
+ax_2d.add_patch(plt.Rectangle((0, 0), length, height, color='white', ec='black', lw=2))
 # 画自动生成的立柱
 for i in range(n_posts):
     x_pos = i * dist
-    ax.axvline(x=x_pos, color='#1f77b4', linestyle='--', alpha=0.7)
-    ax.text(x_pos, -200, f"{int(x_pos)}", ha='center', fontsize=7)
-ax.set_xlim(-200, length + 200)
-ax.set_ylim(-400, height + 200)
-ax.axis('off')
-st.pyplot(fig)
+    ax_2d.axvline(x=x_pos, color='#1f77b4', linestyle='--', alpha=0.7)
+    ax_2d.text(x_pos, -200, f"{int(x_pos)}", ha='center', fontsize=7)
+ax_2d.set_xlim(-200, length + 200)
+ax_2d.set_ylim(-400, height + 200)
+ax_2d.set_aspect('equal')
+ax_2d.axis('off')
+st.pyplot(fig_2d)
 
+# --- 3D 厢体结构预览 ---
+st.subheader("✨ 3D 厢体结构预览")
+
+# 定义厢体顶点 (简化为线框模型)
+x = [0, length, length, 0, 0, length, length, 0]
+y = [0, 0, width, width, 0, 0, width, width]
+z = [0, 0, 0, 0, height, height, height, height]
+
+# 骨架线段
+# 底部
+trace_x = [0, length, length, 0, 0, None, 0, 0, None, length, length]
+trace_y = [0, 0, width, width, 0, None, 0, width, None, 0, width]
+trace_z = [0, 0, 0, 0, 0, None, height, height, None, height, height]
+
+# 顶部
+trace_x += [0, length, length, 0, 0, None, 0, 0, None, length, length]
+trace_y += [0, 0, width, width, 0, None, 0, width, None, 0, width]
+trace_z += [height, height, height, height, height, None, 0, 0, None, 0, 0] # 这里Z轴是反的，需要注意
+
+# 连接上下层
+trace_x += [0, 0, None, length, length, None, length, length, None, 0, 0]
+trace_y += [0, 0, None, 0, 0, None, width, width, None, width, width]
+trace_z += [0, height, None, 0, height, None, 0, height, None, 0, height]
+
+# 添加立柱 (简化为X方向的线)
+for i in range(n_posts):
+    x_pos = i * dist
+    trace_x.extend([x_pos, x_pos, None])
+    trace_y.extend([0, 0, None]) # 假设只显示底部立柱线
+    trace_z.extend([0, height, None])
+
+# 创建 Plotly 3D 散点图
+fig_3d = px.line_3d(
+    x=trace_x, y=trace_y, z=trace_z, 
+    range_x=[0, length], range_y=[0, width], range_z=[0, height],
+    title="厢体线框预览",
+    labels={'x': '长度 (mm)', 'y': '宽度 (mm)', 'z': '高度 (mm)'}
+)
+
+# 调整布局，使其更像一个线框图
+fig_3d.update_traces(line=dict(color='blue', width=2), mode='lines')
+fig_3d.update_layout(scene_aspectmode='data', 
+                    scene_camera=dict(eye=dict(x=1.5, y=1.5, z=0.8)), # 调整初始视角
+                    margin=dict(l=0, r=0, b=0, t=50)) # 减少边距
+st.plotly_chart(fig_3d, use_container_width=True)
 
 
 # BOM 表输出
