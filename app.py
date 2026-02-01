@@ -121,3 +121,43 @@ st.download_button(
     file_name='production_bom.csv',
     mime='text/csv',
 )
+
+import ezdxf
+import io
+
+def generate_dxf(L, H, n_posts, dist):
+    # 创建一个新的 DXF 文件（使用 R2010 格式，兼容性最好）
+    doc = ezdxf.new('R2010')
+    msp = doc.modelspace()
+
+    # 1. 绘制蒙皮外轮廓 (图层: 0)
+    msp.add_lwpolyline([(0, 0), (L, 0), (L, H), (0, H), (0, 0)])
+
+    # 2. 绘制立柱中心线/铆钉线 (图层: MARKING)
+    doc.layers.new(name='MARKING', dxfattribs={'color': 1}) # 红色标注线
+    for i in range(n_posts):
+        x = i * dist
+        msp.add_line((x, 0), (x, H), dxfattribs={'layer': 'MARKING'})
+        
+        # 模拟：在立柱线上每隔 200mm 自动打一个铆钉孔
+        for y_hole in range(200, H, 200):
+            msp.add_circle((x, y_hole), radius=2.5, dxfattribs={'layer': 'MARKING'})
+
+    # 将 DXF 写入内存流以便下载
+    out = io.StringIO()
+    doc.write(out)
+    return out.getvalue()
+
+# --- 在 Streamlit UI 中增加下载按钮 ---
+st.subheader("🛠️ 生产数据对接")
+dxf_string = generate_dxf(length, height, n_posts, dist)
+
+col_dxf, col_csv = st.columns(2)
+with col_dxf:
+    st.download_button(
+        label="🚀 下载侧围加工 DXF 图纸",
+        data=dxf_string,
+        file_name=f"side_panel_{length}x{height}.dxf",
+        mime="application/dxf",
+        help="此文件可直接导入 AutoCAD 或激光切割系统"
+    )
